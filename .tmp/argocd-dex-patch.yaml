@@ -1,0 +1,12 @@
+data:
+  dex.config: |
+    connectors:
+    - type: openshift
+      id: openshift
+      name: OpenShift
+      config:
+        issuer: https://c104-e.us-east.containers.cloud.ibm.com:31814
+        clientID: system:serviceaccount:tools:argocd-dex-server
+        clientSecret: 
+        redirectURI: https://argocd-tools.gsi-learning-ocp43-7ec5d722a0ab3f463fdc90eeb94dbc70-0000.us-east.containers.appdomain.cloud/api/dex/callback
+        insecureCA: true

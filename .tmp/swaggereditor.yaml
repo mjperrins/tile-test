@@ -1,0 +1,217 @@
+---
+# Source: swaggereditor-dashboard/templates/service-account.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: swaggereditor-dashboard
+  annotations:
+    serviceaccounts.openshift.io/oauth-redirectreference.primary: '{"kind":"OAuthRedirectReference","apiVersion":"v1","reference":{"kind":"Route","name":"apieditor"}}'
+  labels:
+    app: swaggereditor-dashboard
+    chart: swaggereditor-dashboard-1.0.0
+    release: swaggereditor-dashboard
+    heritage: Helm
+    "app.kubernetes.io/name": swaggereditor-dashboard
+    "helm.sh/chart": swaggereditor-dashboard-1.0.0
+    "app.kubernetes.io/instance": swaggereditor-dashboard
+    "app.kubernetes.io/component": swaggereditor-dashboard-deployment
+---
+# Source: swaggereditor-dashboard/templates/role.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: swaggereditor-dashboard-agent
+  namespace: tools
+  labels:
+    app: swaggereditor-dashboard
+    chart: swaggereditor-dashboard-1.0.0
+    release: swaggereditor-dashboard
+    heritage: Helm
+    "app.kubernetes.io/name": swaggereditor-dashboard
+    "helm.sh/chart": swaggereditor-dashboard-1.0.0
+    "app.kubernetes.io/instance": swaggereditor-dashboard
+    "app.kubernetes.io/component": swaggereditor-dashboard-deployment
+rules:
+  - apiGroups:
+      - security.openshift.io
+    resourceNames:
+      - privileged
+    resources:
+      - securitycontextconstraints
+    verbs:
+      - use
+---
+# Source: swaggereditor-dashboard/templates/role-binding.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: swaggereditor-dashboard-agent
+  labels:
+    app: swaggereditor-dashboard
+    chart: swaggereditor-dashboard-1.0.0
+    release: swaggereditor-dashboard
+    heritage: Helm
+    "app.kubernetes.io/name": swaggereditor-dashboard
+    "helm.sh/chart": swaggereditor-dashboard-1.0.0
+    "app.kubernetes.io/instance": swaggereditor-dashboard
+    "app.kubernetes.io/component": swaggereditor-dashboard-deployment
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: swaggereditor-dashboard-agent
+subjects:
+  - kind: ServiceAccount
+    name: swaggereditor-dashboard
+    namespace: tools
+---
+# Source: swaggereditor-dashboard/templates/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: swaggereditor-dashboard
+  annotations:
+    service.alpha.openshift.io/serving-cert-secret-name: apieditor-tls
+  labels:
+    app: swaggereditor-dashboard
+    chart: swaggereditor-dashboard-1.0.0
+    release: swaggereditor-dashboard
+    heritage: Helm
+    "app.kubernetes.io/name": swaggereditor-dashboard
+    "helm.sh/chart": swaggereditor-dashboard-1.0.0
+    "app.kubernetes.io/instance": swaggereditor-dashboard
+    "app.kubernetes.io/component": swaggereditor-dashboard-deployment
+spec:
+  type: ClusterIP
+  ports:
+    - port: 443
+      targetPort: 8443
+      protocol: TCP
+      name: proxy
+    - port: 80
+      targetPort: 8080
+      protocol: TCP
+      name: http
+  selector:
+    app: swaggereditor-dashboard
+    release: swaggereditor-dashboard
+---
+# Source: swaggereditor-dashboard/templates/deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: swaggereditor-dashboard
+  labels:
+    app: swaggereditor-dashboard
+    chart: swaggereditor-dashboard-1.0.0
+    release: swaggereditor-dashboard
+    heritage: Helm
+    "app.kubernetes.io/name": swaggereditor-dashboard
+    "helm.sh/chart": swaggereditor-dashboard-1.0.0
+    "app.kubernetes.io/instance": swaggereditor-dashboard
+    "app.kubernetes.io/component": swaggereditor-dashboard-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: swaggereditor-dashboard
+      release: swaggereditor-dashboard
+  template:
+    metadata:
+      labels:
+        app: swaggereditor-dashboard
+        release: swaggereditor-dashboard
+        "app.kubernetes.io/name": swaggereditor-dashboard
+        "helm.sh/chart": swaggereditor-dashboard-1.0.0
+        "app.kubernetes.io/instance": swaggereditor-dashboard
+        "app.kubernetes.io/component": swaggereditor-dashboard-pod
+    spec:
+      serviceAccountName: swaggereditor-dashboard
+      volumes:
+        - name: cache
+          emptyDir: {}
+        - name: proxy-tls
+          secret:
+            secretName: apieditor-tls
+      initContainers:
+        - name: cache-permissions
+          image: alpine:latest
+          command:
+            - /bin/sh
+            - -c
+            - |
+              chgrp -v -R 0 /mount
+              chmod -v -R g+rwx /mount
+              mkdir -p /mount/nginx/client_temp
+          securityContext:
+            privileged: true
+          volumeMounts:
+            - mountPath: /mount
+              name: cache
+      containers:
+        - name: oauth-proxy
+          image: openshift/oauth-proxy:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8443
+              name: public
+          args:
+            - --https-address=:8443
+            - --provider=openshift
+            - --openshift-service-account=swaggereditor-dashboard-agent
+            - --upstream=http://localhost:8080
+            - --tls-cert=/etc/tls/private/tls.crt
+            - --tls-key=/etc/tls/private/tls.key
+            - --cookie-secret=SECRET
+          volumeMounts:
+            - mountPath: /etc/tls/private
+              name: proxy-tls
+        - name: swaggereditor-dashboard
+          image: "docker.io/swaggerapi/swagger-editor:v3.8.0"
+          imagePullPolicy: Always
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+          livenessProbe:
+            tcpSocket:
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          readinessProbe:
+            tcpSocket:
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          securityContext:
+            privileged: true
+          volumeMounts:
+            - mountPath: /var/cache
+              name: cache
+          resources:
+            {}
+---
+# Source: swaggereditor-dashboard/templates/route.yaml
+apiVersion: v1
+kind: Route
+metadata:
+  name: apieditor
+  labels:
+    app: swaggereditor-dashboard
+    chart: swaggereditor-dashboard-1.0.0
+    release: swaggereditor-dashboard
+    heritage: Helm
+    "app.kubernetes.io/name": swaggereditor-dashboard
+    "helm.sh/chart": swaggereditor-dashboard-1.0.0
+    "app.kubernetes.io/instance": swaggereditor-dashboard
+    "app.kubernetes.io/component": swaggereditor-dashboard-deployment
+spec:
+  to:
+    kind: Service
+    name: swaggereditor-dashboard
+    weight: 100
+  port:
+    targetPort: http
+  tls:
+    termination: edge
+    insecureEdgeTerminationPolicy: Redirect
+  wildcardPolicy: None

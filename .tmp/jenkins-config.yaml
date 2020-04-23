@@ -1,0 +1,11 @@
+---
+# Source: pipeline-config/templates/config-map.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+    name: pipeline-config
+    labels:
+        group: catalyst-tools
+data:
+    PIPELINE_URL: https://c104-e.us-east.containers.cloud.ibm.com:31814/console/projects
+

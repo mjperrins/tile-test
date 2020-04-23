@@ -1,0 +1,21 @@
+---
+# Source: solsa-cm/templates/solsa-cm.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: solsa-cm
+  labels:
+    "app.kubernetes.io/name": "argocd"
+    "app.kubernetes.io/instance": "argocd"
+    group: "catalyst-tools"
+data:
+  solsa.yaml: |
+    clusters:
+    - name: 'in-cluster'
+      ingress:
+        iks:
+          subdomain: "gsi-learning-ocp43-7ec5d722a0ab3f463fdc90eeb94dbc70-0000.us-east.containers.appdomain.cloud"
+          tlssecret: "gsi-learning-ocp43-7ec5d722a0ab3f463fdc90eeb94dbc70-0000"
+    contexts:
+    - name: 'in-cluster-context'
+      cluster: 'in-cluster'

@@ -1,0 +1,21 @@
+- op: add
+  path: /spec/template/spec/containers/0/env/-
+  value:
+    name: LDAPIHOST
+    value: api.us-east.logging.cloud.ibm.com
+- op: add
+  path: /spec/template/spec/containers/0/env/-
+  value:
+    name: LDLOGHOST
+    value: logs.us-east.logging.cloud.ibm.com
+- op: add
+  path: /spec/template/spec/containers/0/volumeMounts/-
+  value:
+    mountPath: /var/data/kubeletlogs
+    name: vardatakubeletlogs
+- op: add
+  path: /spec/template/spec/volumes/-
+  value:
+    hostPath:
+      path: /var/data/kubeletlogs
+    name: vardatakubeletlogs

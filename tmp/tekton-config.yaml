@@ -1,0 +1,19 @@
+---
+# Source: tekton/templates/config-map.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: tekton-config
+  labels:
+    app.kubernetes.io/name: tekton
+    app.kubernetes.io/version: 0.1.0
+    app.kubernetes.io/part-of: catalyst
+    app.kubernetes.io/component: tools
+    chart: tekton-0.1.0
+    release: tekton
+    group: catalyst-tools
+  annotations:
+    description: Config map to hold the url for tekton in the environment so that other components can access it
+data:
+  TEKTON_URL: "https://tekton-dashboard-tekton-pipelines.gsi-learning-ocp43-7ec5d722a0ab3f463fdc90eeb94dbc70-0000.us-east.containers.appdomain.cloud"
+

@@ -1,0 +1,163 @@
+---
+# Source: developer-dashboard/templates/service-account.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: developer-dashboard
+  annotations:
+    serviceaccounts.openshift.io/oauth-redirectreference.primary: '{"kind":"OAuthRedirectReference","apiVersion":"v1","reference":{"kind":"Route","name":"dashboard"}}'
+  labels:
+    "app.kubernetes.io/name": developer-dashboard
+    "helm.sh/chart": developer-dashboard-0.1.0
+    "app.kubernetes.io/instance": developer-dashboard
+    "app.kubernetes.io/component": developer-dashboard-serviceAccount
+---
+# Source: developer-dashboard/templates/role.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: developer-dashboard-agent
+  labels:
+    "app.kubernetes.io/name": developer-dashboard
+    "helm.sh/chart": developer-dashboard-0.1.0
+    "app.kubernetes.io/instance": developer-dashboard
+    "app.kubernetes.io/component": developer-dashboard-role
+rules:
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    verbs: ["*"]
+---
+# Source: developer-dashboard/templates/role-binding.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: developer-dashboard-agent
+  labels:
+    "app.kubernetes.io/name": developer-dashboard
+    "helm.sh/chart": developer-dashboard-0.1.0
+    "app.kubernetes.io/instance": developer-dashboard
+    "app.kubernetes.io/component": developer-dashboard-roleBinding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: developer-dashboard-agent
+subjects:
+  - kind: ServiceAccount
+    name: developer-dashboard
+    namespace: tools
+---
+# Source: developer-dashboard/templates/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: developer-dashboard
+  annotations:
+    service.alpha.openshift.io/serving-cert-secret-name: dashboard-tls
+  labels:
+    app: developer-dashboard
+    chart: developer-dashboard-0.1.0
+    release: developer-dashboard
+    heritage: Helm
+spec:
+  type: ClusterIP
+  ports:
+    - port: 443
+      targetPort: 8443
+      protocol: TCP
+      name: proxy
+    - port: 80
+      targetPort: 3000
+      protocol: TCP
+      name: http
+  selector:
+    app: developer-dashboard
+    release: developer-dashboard
+---
+# Source: developer-dashboard/templates/deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: developer-dashboard
+  labels:
+    app: developer-dashboard
+    chart: developer-dashboard-0.1.0
+    release: developer-dashboard
+    heritage: Helm
+    "app.kubernetes.io/name": developer-dashboard
+    "helm.sh/chart": developer-dashboard-0.1.0
+    "app.kubernetes.io/instance": developer-dashboard
+    "app.kubernetes.io/component": developer-dashboard-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: developer-dashboard
+      release: developer-dashboard
+  template:
+    metadata:
+      labels:
+        app: developer-dashboard
+        release: developer-dashboard
+        "app.kubernetes.io/name": developer-dashboard
+        "helm.sh/chart": developer-dashboard-0.1.0
+        "app.kubernetes.io/instance": developer-dashboard
+        "app.kubernetes.io/component": developer-dashboard-pod
+    spec:
+      serviceAccountName: developer-dashboard
+      volumes:
+        - name: proxy-tls
+          secret:
+            secretName: dashboard-tls
+      containers:
+        - name: oauth-proxy
+          image: openshift/oauth-proxy:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8443
+              name: public
+          args:
+            - --https-address=:8443
+            - --provider=openshift
+            - --openshift-service-account=developer-dashboard
+            - --upstream=http://localhost:3000
+            - --tls-cert=/etc/tls/private/tls.crt
+            - --tls-key=/etc/tls/private/tls.key
+            - --cookie-secret=SECRET
+          volumeMounts:
+            - mountPath: /etc/tls/private
+              name: proxy-tls
+        - name: developer-dashboard
+          image: "ibmgaragecloud/developer-dashboard:1.0.28"
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 3000
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /
+              port: http
+          readinessProbe:
+            httpGet:
+              path: /
+              port: http
+          envFrom:
+            - configMapRef:
+                name: "ibmcloud-config"
+                optional: true
+          resources:
+            {}
+---
+# Source: developer-dashboard/templates/route.yaml
+apiVersion: v1
+kind: Route
+metadata:
+  name: dashboard
+spec:
+  port:
+    targetPort: http
+  to:
+    kind: Service
+    name: developer-dashboard
+  tls:
+    termination: Edge

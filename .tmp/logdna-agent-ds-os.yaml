@@ -1,0 +1,90 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  labels:
+    app: logdna-agent
+  name: logdna-agent
+spec:
+  selector:
+    matchLabels:
+      app: logdna-agent
+  template:
+    metadata:
+      labels:
+        app: logdna-agent
+    spec:
+      containers:
+      - env:
+        - name: LOGDNA_AGENT_KEY
+          valueFrom:
+            secretKeyRef:
+              key: logdna-agent-key
+              name: logdna-agent-key
+        - name: LOGDNA_PLATFORM
+          value: k8s
+        - name: USEJOURNALD
+          value: files
+        - name: LDAPIHOST
+          value: api.us-east.logging.cloud.ibm.com
+        - name: LDLOGHOST
+          value: logs.us-east.logging.cloud.ibm.com
+        image: logdna/logdna-agent:latest
+        imagePullPolicy: Always
+        name: logdna-agent
+        resources:
+          limits:
+            memory: 500Mi
+          requests:
+            cpu: 20m
+        securityContext:
+          privileged: true
+        volumeMounts:
+        - mountPath: /var/log
+          name: varlog
+        - mountPath: /var/data
+          name: vardata
+        - mountPath: /var/lib/docker/containers
+          name: varlibdockercontainers
+          readOnly: true
+        - mountPath: /mnt
+          name: mnt
+          readOnly: true
+        - mountPath: /var/run/docker.sock
+          name: docker
+        - mountPath: /etc/os-release
+          name: osrelease
+        - mountPath: /etc/logdna-hostname
+          name: logdnahostname
+        - mountPath: /var/data/kubeletlogs
+          name: vardatakubeletlogs
+      serviceAccount: logdna-agent
+      serviceAccountName: logdna-agent
+      volumes:
+      - hostPath:
+          path: /var/log
+        name: varlog
+      - hostPath:
+          path: /var/data
+        name: vardata
+      - hostPath:
+          path: /var/lib/docker/containers
+        name: varlibdockercontainers
+      - hostPath:
+          path: /mnt
+        name: mnt
+      - hostPath:
+          path: /var/run/docker.sock
+        name: docker
+      - hostPath:
+          path: /etc/os-release
+        name: osrelease
+      - hostPath:
+          path: /etc/hostname
+        name: logdnahostname
+      - hostPath:
+          path: /var/data/kubeletlogs
+        name: vardatakubeletlogs
+  updateStrategy:
+    rollingUpdate:
+      maxUnavailable: 100%
+    type: RollingUpdate
